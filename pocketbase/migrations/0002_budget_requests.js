@@ -4,11 +4,11 @@ migrate(
     const requests = new Collection({
       type: 'base',
       name: 'budget_requests',
-      listRule: 'owner_id = @request.auth.id',
-      viewRule: 'owner_id = @request.auth.id',
-      createRule: '@request.auth.id != "" && owner_id = @request.auth.id',
-      updateRule: 'owner_id = @request.auth.id',
-      deleteRule: 'owner_id = @request.auth.id',
+      listRule: '',
+      viewRule: '',
+      createRule: '',
+      updateRule: '',
+      deleteRule: '',
       fields: [
         new TextField({ name: 'owner_id', required: true, max: 80 }),
         new TextField({ name: 'title', required: true, max: 180 }),

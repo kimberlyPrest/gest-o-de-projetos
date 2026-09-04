@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-04T14:00:53.328Z",
+  "generatedAt": "2026-09-04T14:09:24.071Z",
   "collections": [
     {
       "name": "users",
@@ -29,20 +29,38 @@
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate"]
+          "autodateTriggers": [
+            "onCreate"
+          ]
         },
         {
           "name": "updated",
           "type": "autodate",
           "required": false,
           "system": false,
-          "autodateTriggers": ["onCreate", "onUpdate"]
+          "autodateTriggers": [
+            "onCreate",
+            "onUpdate"
+          ]
         }
       ],
       "indexes": [
         "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
         "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
       ]
+    },
+    {
+      "name": "budget_requests",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": "",
+        "update": null,
+        "delete": ""
+      },
+      "fields": [],
+      "indexes": []
     }
   ]
 }
