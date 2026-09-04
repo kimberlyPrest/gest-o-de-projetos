@@ -154,15 +154,8 @@ export default function Index() {
     )
   }
 
-  const counts = useMemo(
-    () =>
-      Object.fromEntries(
-        stages.map((stage) => [
-          stage.id,
-          requests.filter((item) => item.status === stage.id).length,
-        ]),
-      ),
-    [requests],
+  const counts = Object.fromEntries(
+    stages.map((stage) => [stage.id, requests.filter((item) => item.status === stage.id).length]),
   )
 
   return (
