@@ -1,20 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
-import {
-  CalendarClock,
-  Check,
-  ChevronRight,
-  FileText,
-  LogOut,
-  Plus,
-  Sparkles,
-  UserRound,
-} from 'lucide-react'
+import { Check, ChevronRight, FileText, LogOut, Plus, Sparkles, UserRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import pb from '@/lib/pocketbase/client'
 
-type Stage =
+type StageId =
   | 'entrada'
   | 'entendimento'
   | 'levantamento'
@@ -22,6 +13,7 @@ type Stage =
   | 'proposta'
   | 'aprovacao'
   | 'envio'
+
 type RequestRecord = {
   id: string
   title: string
@@ -32,12 +24,12 @@ type RequestRecord = {
   items?: string
   discount_percent?: number
   approval_notes?: string
-  follow_up_at?: string
-  status: Stage
+  status: StageId
   created: string
 }
-const stages: { id: Stage; label: string; hint: string }[] = [
-  { id: 'entrada', label: 'Entrada', hint: 'Pedido e anexos' },
+
+const stages: Array<{ id: StageId; label: string; hint: string }> = [
+  { id: 'entrada', label: 'Entrada', hint: 'Pedido recebido' },
   { id: 'entendimento', label: 'Entendimento', hint: 'Notas técnicas' },
   { id: 'levantamento', label: 'Levantamento', hint: 'Itens e quantidades' },
   { id: 'precificacao', label: 'Precificação', hint: 'Tabela e desconto' },
@@ -45,31 +37,36 @@ const stages: { id: Stage; label: string; hint: string }[] = [
   { id: 'aprovacao', label: 'Aprovação', hint: 'Decisão do sócio' },
   { id: 'envio', label: 'Envio', hint: 'Follow-up' },
 ]
-const blank = { title: '', client_name: '', source: 'E-mail', description: '' }
-const date = (value?: string) =>
-  value ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(value)) : '—'
+
+const emptyForm = { title: '', client_name: '', source: 'E-mail', description: '' }
+const formatDate = (value: string) =>
+  new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' }).format(new Date(value))
 
 export default function Index() {
   const [user, setUser] = useState(pb.authStore.record)
   const [requests, setRequests] = useState<RequestRecord[]>([])
   const [selected, setSelected] = useState<RequestRecord | null>(null)
-  const [form, setForm] = useState(blank)
+  const [form, setForm] = useState(emptyForm)
   const [login, setLogin] = useState({ email: '', password: '' })
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+
   useEffect(() => pb.authStore.onChange(() => setUser(pb.authStore.record)), [])
   useEffect(() => {
-    if (user) void load()
+    if (user) void loadRequests()
   }, [user])
-  async function load() {
+
+  async function loadRequests() {
     try {
-      setRequests(
-        await pb.collection('budget_requests').getFullList<RequestRecord>({ sort: '-created' }),
-      )
+      const records = await pb
+        .collection('budget_requests')
+        .getFullList<RequestRecord>({ sort: '-created' })
+      setRequests(records)
     } catch {
       setMessage('Não foi possível carregar os pedidos.')
     }
   }
+
   async function signIn(event: FormEvent) {
     event.preventDefault()
     setBusy(true)
@@ -81,43 +78,82 @@ export default function Index() {
       setBusy(false)
     }
   }
-  async function create(event: FormEvent) {
+
+  async function createRequest(event: FormEvent) {
     event.preventDefault()
     if (!user) return
     setBusy(true)
     try {
-      const item = await pb
-        .collection('budget_requests')
-        .create<RequestRecord>({
-          ...form,
-          owner: user.id,
-          status: 'entrada',
-          created_at: new Date().toISOString(),
-        })
-      setRequests((all) => [item, ...all])
-      setSelected(item)
-      setForm(blank)
+      const record = await pb.collection('budget_requests').create<RequestRecord>({
+        ...form,
+        owner_id: user.id,
+        status: 'entrada',
+      })
+      setRequests((current) => [record, ...current])
+      setSelected(record)
+      setForm(emptyForm)
     } catch {
       setMessage('Não foi possível criar o pedido.')
     } finally {
       setBusy(false)
     }
   }
-  async function update(patch: Partial<RequestRecord>) {
+
+  async function updateRequest(patch: Partial<RequestRecord>) {
     if (!selected) return
     try {
-      const item = await pb.collection('budget_requests').update<RequestRecord>(selected.id, patch)
-      setSelected(item)
-      setRequests((all) => all.map((x) => (x.id === item.id ? item : x)))
+      const record = await pb
+        .collection('budget_requests')
+        .update<RequestRecord>(selected.id, patch)
+      setSelected(record)
+      setRequests((current) => current.map((item) => (item.id === record.id ? record : item)))
       setMessage('Alteração salva.')
     } catch {
       setMessage('Não foi possível salvar.')
     }
   }
-  if (!user)
+
+  if (!user) {
     return (
-      <AuthScreen login={login} setLogin={setLogin} signIn={signIn} busy={busy} message={message} />
+      <main className="login-shell">
+        <div className="login-card">
+          <div className="brand-mark">OT</div>
+          <p className="eyebrow">ORÇAMENTOS TÉCNICOS</p>
+          <h1>
+            Responda mais rápido.
+            <br />
+            <span>Decida melhor.</span>
+          </h1>
+          <p className="muted">Central para transformar pedidos técnicos em propostas aprovadas.</p>
+          <form onSubmit={signIn} className="stack">
+            <label>
+              E-mail
+              <Input
+                required
+                type="email"
+                value={login.email}
+                onChange={(event) => setLogin({ ...login, email: event.target.value })}
+              />
+            </label>
+            <label>
+              Senha
+              <Input
+                required
+                type="password"
+                value={login.password}
+                onChange={(event) => setLogin({ ...login, password: event.target.value })}
+              />
+            </label>
+            {message && <p className="error">{message}</p>}
+            <Button disabled={busy} className="primary-button">
+              {busy ? 'Entrando…' : 'Entrar na central'} <ChevronRight />
+            </Button>
+          </form>
+        </div>
+      </main>
     )
+  }
+
   const counts = useMemo(
     () =>
       Object.fromEntries(
@@ -128,6 +164,7 @@ export default function Index() {
       ),
     [requests],
   )
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -188,7 +225,7 @@ export default function Index() {
                   <span className="card-source">{item.source}</span>
                   <strong>{item.title}</strong>
                   <small>{item.client_name}</small>
-                  <span className="card-date">{date(item.created)}</span>
+                  <span className="card-date">{formatDate(item.created)}</span>
                 </button>
               ))}
             {stage.id === 'entrada' && (
@@ -213,13 +250,13 @@ export default function Index() {
             </div>
             <FileText />
           </div>
-          <form onSubmit={create} className="request-form">
+          <form onSubmit={createRequest} className="request-form">
             <label>
               Título do pedido
               <Input
                 required
                 value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                onChange={(event) => setForm({ ...form, title: event.target.value })}
                 placeholder="Ex.: Estrutura metálica"
               />
             </label>
@@ -228,7 +265,7 @@ export default function Index() {
               <Input
                 required
                 value={form.client_name}
-                onChange={(e) => setForm({ ...form, client_name: e.target.value })}
+                onChange={(event) => setForm({ ...form, client_name: event.target.value })}
                 placeholder="Nome da empresa"
               />
             </label>
@@ -236,7 +273,7 @@ export default function Index() {
               Origem
               <select
                 value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
+                onChange={(event) => setForm({ ...form, source: event.target.value })}
               >
                 <option>E-mail</option>
                 <option>WhatsApp</option>
@@ -247,7 +284,7 @@ export default function Index() {
               Resumo recebido
               <Textarea
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(event) => setForm({ ...form, description: event.target.value })}
                 placeholder="Pedido inicial, medidas ou contexto…"
               />
             </label>
@@ -257,7 +294,7 @@ export default function Index() {
           </form>
         </div>
         {selected ? (
-          <Detail selected={selected} update={update} />
+          <DetailPanel selected={selected} update={updateRequest} />
         ) : (
           <div className="panel empty-panel">
             <Sparkles size={28} />
@@ -270,60 +307,7 @@ export default function Index() {
   )
 }
 
-function AuthScreen({
-  login,
-  setLogin,
-  signIn,
-  busy,
-  message,
-}: {
-  login: { email: string; password: string }
-  setLogin: (value: { email: string; password: string }) => void
-  signIn: (event: FormEvent) => void
-  busy: boolean
-  message: string
-}) {
-  return (
-    <main className="login-shell">
-      <div className="login-card">
-        <div className="brand-mark">OT</div>
-        <p className="eyebrow">ORÇAMENTOS TÉCNICOS</p>
-        <h1>
-          Responda mais rápido.
-          <br />
-          <span>Decida melhor.</span>
-        </h1>
-        <p className="muted">Central para transformar pedidos técnicos em propostas aprovadas.</p>
-        <form onSubmit={signIn} className="stack">
-          <label>
-            E-mail
-            <Input
-              required
-              type="email"
-              value={login.email}
-              onChange={(e) => setLogin({ ...login, email: e.target.value })}
-            />
-          </label>
-          <label>
-            Senha
-            <Input
-              required
-              type="password"
-              value={login.password}
-              onChange={(e) => setLogin({ ...login, password: e.target.value })}
-            />
-          </label>
-          {message && <p className="error">{message}</p>}
-          <Button disabled={busy} className="primary-button">
-            {busy ? 'Entrando…' : 'Entrar na central'} <ChevronRight />
-          </Button>
-        </form>
-      </div>
-    </main>
-  )
-}
-
-function Detail({
+function DetailPanel({
   selected,
   update,
 }: {
@@ -336,6 +320,12 @@ function Detail({
   const [items, setItems] = useState(selected.items || '')
   const [discount, setDiscount] = useState(String(selected.discount_percent || 0))
   const [approval, setApproval] = useState(selected.approval_notes || '')
+  const suggest = () =>
+    setNotes(
+      selected.status === 'entrada'
+        ? `Briefing sugerido para ${selected.client_name}: validar aplicação, dimensões, prazo e condições de uso.`
+        : 'Sugestão: confirmar item, especificação, unidade, quantidade e observações da planta.',
+    )
   const save = () =>
     update({
       technical_notes: notes,
@@ -343,12 +333,7 @@ function Detail({
       discount_percent: Number(discount),
       approval_notes: approval,
     })
-  const suggest = () =>
-    setNotes(
-      selected.status === 'entrada'
-        ? `Briefing sugerido para ${selected.client_name}: validar aplicação, dimensões, prazo e condições de uso.`
-        : 'Sugestão: confirmar item, especificação, unidade, quantidade e observações da planta.',
-    )
+
   return (
     <div className="panel detail-panel">
       <div className="panel-title">
@@ -356,7 +341,7 @@ function Detail({
           <p className="eyebrow">PEDIDO ATIVO</p>
           <h2>{selected.title}</h2>
           <p className="muted">
-            {selected.client_name} · recebido em {date(selected.created)}
+            {selected.client_name} · recebido em {formatDate(selected.created)}
           </p>
         </div>
         <span className="status-pill">{stages[index].label}</span>
@@ -366,7 +351,7 @@ function Detail({
           Notas e contexto técnico
           <Textarea
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
+            onChange={(event) => setNotes(event.target.value)}
             placeholder="Registre a ligação e condição de uso."
           />
         </label>
@@ -374,7 +359,7 @@ function Detail({
           Itens e quantidades
           <Textarea
             value={items}
-            onChange={(e) => setItems(e.target.value)}
+            onChange={(event) => setItems(event.target.value)}
             placeholder="Item — quantidade — observação"
           />
         </label>
@@ -386,14 +371,14 @@ function Detail({
               min="0"
               max="100"
               value={discount}
-              onChange={(e) => setDiscount(e.target.value)}
+              onChange={(event) => setDiscount(event.target.value)}
             />
           </label>
         )}
         {selected.status === 'aprovacao' && (
           <label>
             Decisão do sócio / motivo
-            <Textarea value={approval} onChange={(e) => setApproval(e.target.value)} />
+            <Textarea value={approval} onChange={(event) => setApproval(event.target.value)} />
           </label>
         )}
         <div className="detail-actions">
@@ -410,18 +395,6 @@ function Detail({
               Avançar para {next.label} <ChevronRight size={16} />
             </Button>
           )}
-        </div>
-        <div className="timeline">
-          <div>
-            <CalendarClock size={16} />
-            <span>Follow-up previsto</span>
-            <b>{selected.follow_up_at ? date(selected.follow_up_at) : 'A definir no envio'}</b>
-          </div>
-          <div>
-            <Check size={16} />
-            <span>Próxima saída</span>
-            <b>{next ? next.hint : 'Proposta enviada'}</b>
-          </div>
         </div>
       </div>
     </div>
