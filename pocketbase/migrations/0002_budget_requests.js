@@ -6,9 +6,9 @@ migrate(
       name: 'budget_requests',
       listRule: 'owner = @request.auth.id',
       viewRule: 'owner = @request.auth.id',
-      createRule: '@request.auth.id != "" && owner = @request.auth.id',
-      updateRule: 'owner = @request.auth.id',
-      deleteRule: 'owner = @request.auth.id',
+      createRule: '@request.auth.id != "" && owner.id = @request.auth.id',
+      updateRule: 'owner.id = @request.auth.id',
+      deleteRule: 'owner.id = @request.auth.id',
       fields: [
         new RelationField({ name: 'owner', collectionId: users.id, maxSelect: 1, required: true }),
         new TextField({ name: 'title', required: true, max: 180 }),
